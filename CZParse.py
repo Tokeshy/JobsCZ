@@ -12,6 +12,7 @@ published = 0
 Current_iteration_scanned = []
 pre_scanned = []
 
+# let's look for already scaned vacancies
 file_path = os.path.dirname(__file__) + os.sep + 'pre_scaned.txt'
 if os.path.exists(file_path):
     with open(file_path, "r") as text_file:
@@ -21,7 +22,7 @@ if os.path.exists(file_path):
 
 # optional var section
 # you should change scan period and salary by correcting this variables
-parse_link = main_link_24h  # also available - main_link_24h; main_link_3d; main_link_7d
+parse_link = main_link_7d  # also available - main_link_24h; main_link_3d; main_link_7d
 min_rec_sallary = 55000  # minimal requared sallary
 
 
@@ -167,10 +168,11 @@ def prescaned_updater():
         text_file.close()
 
 
-start_time = datetime.now()
-initial_scan(parse_link)
-link_parser(parse_link)
-done_time = datetime.now()
-printer()
-prescaned_updater()
-print(Current_iteration_scanned)
+if __name__ == '__main__':
+    start_time = datetime.now()
+    initial_scan(parse_link)
+    link_parser(parse_link)
+    done_time = datetime.now()
+    printer()
+    prescaned_updater()
+    print(Current_iteration_scanned)
