@@ -59,7 +59,7 @@ def word_cleaner(word_to_clean: str) -> str:
 
 
 def check_requirements (lnk: str) -> bool: 
-    # looking for not  
+    # looking for requirements  
     global not_permited_iteration_02
     found = False
     page_to_check = get(lnk).text
@@ -76,53 +76,60 @@ def link_parser (work_link: str):
     for current_page in range(1, page_countity + 1):
         current_parse_link = work_link + post_fix + str(current_page)
         temp_str_set = get(current_parse_link).text.split('<div class="standalone search-list__item"') 
-
+ 
         for record_index in range (1, len(temp_str_set)):
+            global output, counter, pre_scanned, Current_iteration_scanned
             position_name = ''
             sallary_range= ''
             min_sallary= ''
             position_link= ''
             position_id = ''
-            global output, counter, pre_scanned, Current_iteration_scanned
-
-            # getting field's values
+            filtered = False
             current_record = temp_str_set[record_index]
 
+            # filtering iteration #1 - scaning position name - Position name filter
             if current_record.find('main-info__title__link">') > 0:
-                position_name = current_record[current_record.index('main-info__title__link">')+24 : current_record.index('</a></h3>')]        
-            
-            if (current_record.find('tags__salary--label">') > 0) and (current_record.find('Kč') > 0):
-                sallary_range = number_cleaner(current_record[current_record.index('tags__salary--label">') + 23 : current_record.index('Kč')]) # Обязательна проверка наличия данного поля Kč # еще это было обернуто в WordCleaner
-                if sallary_range.find('-') > 0 :
-                    min_sallary = sallary_range[0 : sallary_range.index('-')]
-                else:
-                    min_sallary = 'not set'
-            else:
-                sallary_range = 'not set'
-                min_sallary = 'not set'
-            
-            if current_record.find('main-info__title"><a href="') > 0:
-                position_link = current_record[current_record.index('main-info__title"><a href="') + 27 : current_record.index('data-ad-id="')]
-            else:
-                filtered = True
-
-            if current_record.find('data-position-id="') > 0:
-                position_id = current_record[current_record.index('data-position-id="') + 18 : current_record.index('"><div class')]
-        
-        # filtering Section:
-            if min_sallary == 'not set':
-                filtered = False
-            else:
-                if int(min_sallary) >= min_rec_sallary:
-                    filtered = False
-                else:
-                    filtered = True
-            if filtered == False:
+                position_name = current_record[current_record.index('main-info__title__link">')+24 : current_record.index('</a></h3>')]
                 for keyword in not_permited_iteration_01:
                     if (position_name.lower().find(keyword) > 0) or (position_name == ''):
                         filtered = True
                         break
+                if filtered == False:
+                    # position ID filter
+                    if current_record.find('data-position-id="') > 0:
+                        position_id = current_record[current_record.index('data-position-id="') + 18 : current_record.index('"><div class')]
+                        if ('p_id-' + position_id) in pre_scanned:
+                            filtered = True
+
+                # if not filtered getting field's values    
+                if filtered == False:
+                    if (current_record.find('tags__salary--label">') > 0) and (current_record.find('Kč') > 0):
+                        sallary_range = number_cleaner(current_record[current_record.index('tags__salary--label">') + 23 : current_record.index('Kč')])
+                        if sallary_range.find('-') > 0 :
+                            min_sallary = sallary_range[0 : sallary_range.index('-')]
+                        else:
+                            min_sallary = 'not set'
+                    else:
+                        sallary_range = 'not set'
+                        min_sallary = 'not set'
+                    if current_record.find('main-info__title"><a href="') > 0:
+                        position_link = current_record[current_record.index('main-info__title"><a href="') + 27 : current_record.index('data-ad-id="')]
+                    else:
+                        filtered = True
+            else:
+                filtered = True
+        
+            # sallary filter
+            if filtered == False:
+                if min_sallary == 'not set':
+                    filtered = False
+                else:
+                    if int(min_sallary) >= min_rec_sallary:
+                        filtered = False
+                    else:
+                        filtered = True
             
+            # slow filtering - scaning requirements - iteration #2
             if filtered == False and len(position_link) > 3:
                 try:
                     if check_requirements(position_link) == False:
@@ -133,30 +140,14 @@ def link_parser (work_link: str):
                     print(position_link)
                     filtered = True
 
-            # filtering by iteration 2
-            if filtered == False:
-                if ('p_id-' + position_id) in pre_scanned:
-                    filtered = True
-
-
             if filtered == False:
                 counter += 1
                 curr_rec = [word_cleaner(position_name), 'p_id-' + position_id, sallary_range, min_sallary, word_cleaner(position_link)]
                 Current_iteration_scanned.append('p_id-' + str(position_id))
-                pre_scanned.append('p_id-' + str(position_id))
-                
+                pre_scanned.append('p_id-' + str(position_id))           
                 output['fnd_'+str(counter)] = curr_rec
 
-    message = f'Total scaned {str(published)} vacancies for this period \nSelected for review {str(counter)} position.'
-
-
-def printer():
-    # console output
-    global output, message, done_time, start_time
-    print(message)
-    print(f'Done in ' + str(done_time - start_time))
-    for key, value in output.items():
-        print(key, value)
+    message = f'Total scaned {str(published)} vacancies for this period \nSelected for review {str(counter)} position.\n'
     
     
 def prescaned_updater():
@@ -168,11 +159,36 @@ def prescaned_updater():
         text_file.close()
 
 
+def printer():
+    # console output
+    global output, message, done_time, start_time, counter, Current_iteration_scanned
+    if counter > 0:
+        message = message + f'Done in ' + str(done_time - start_time)
+        print(message)
+        for key, value in output.items():
+            print(key, value)
+        save_search_result(message + '\n')
+        prescaned_updater()
+        print('Finded (and aded to pre_scaned.txt) IDs:')
+        print(Current_iteration_scanned)
+    else:
+        print(f'Nothing to show (( \n0 vacancies were found')
+
+
+def save_search_result(head : str):
+    # let's just save our vacancies
+    global output
+    output_path = os.path.dirname(__file__) + os.sep + 'scaned_' + datetime.now().strftime('%Y.%m.%d_%H-%M-%S') + '.txt'
+    with open(output_path, "w", encoding="utf-8") as text_file:
+        text_file.write(head)
+        for key, value in output.items():
+            text_file.write("%s\n" %(key + str(value)))
+        text_file.close()
+
+
 if __name__ == '__main__':
     start_time = datetime.now()
     initial_scan(parse_link)
     link_parser(parse_link)
     done_time = datetime.now()
     printer()
-    prescaned_updater()
-    print(Current_iteration_scanned)
